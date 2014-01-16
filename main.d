@@ -21,6 +21,7 @@ enum float Slide = 0.6f;
 enum short Move = 15;
 enum ushort WinWidth = 640;
 enum ushort WinHeight = 480;
+enum ubyte ShotWait = 100;
 
 void inc_var(ref float d) pure nothrow {
 	if (d < 0f) {
@@ -77,6 +78,8 @@ void main() {
 
 	float sx = 0f, sy = 0f;
 
+	size_t lastShot = 0;
+
 	List!Sprite bullets = new List!Sprite();
 
 	Event event;
@@ -106,11 +109,15 @@ void main() {
 							sy = Move;
 							break;
 						case Keyboard.Code.Space:
-							shooter.row = 1;
+							if (lastShot == 0 || (lastShot + ShotWait) < Clock.getTicks()) {
+								lastShot = Clock.getTicks();
 
-							Sprite my_bullet = new Sprite(bullet);
-							my_bullet.setPosition(shooter.X + shooter.width, shooter.Y + (shooter.height / 2));
-							bullets.push_back(my_bullet);
+								shooter.row = 1;
+
+								Sprite my_bullet = new Sprite(bullet);
+								my_bullet.setPosition(shooter.X + shooter.width, shooter.Y + (shooter.height / 2));
+								bullets.push_back(my_bullet);
+							}
 							break;
 						default: break;
 					}
