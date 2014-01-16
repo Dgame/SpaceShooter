@@ -65,6 +65,13 @@ void smooth_move(Spritesheet sp, ref float x, ref float y) {
 	sp.move(x, y);
 }
 
+enum State : ubyte {
+	Menu,
+	Game,
+	Paused,
+	Exit
+}
+
 void main() {
 	Window wnd = new Window(VideoMode(WinWidth, WinHeight), "Dgame Test");
 	wnd.setVerticalSync(Window.Sync.Disable);
@@ -76,11 +83,11 @@ void main() {
 	Spritesheet shooter = new Spritesheet(shooter_img, ShortRect(0, 0, 64, 64));
 	shooter.setPosition(150, 50);
 
-	float sx = 0f, sy = 0f;
-
-	size_t lastShot = 0;
-
 	List!Sprite bullets = new List!Sprite();
+
+	float sx = 0f, sy = 0f;
+	size_t lastShot = 0;
+	State state = State.Menu;
 
 	Event event;
 	while (wnd.isOpen()) {
