@@ -78,15 +78,19 @@ void main() {
 	wnd.setFpsLimit(30);
 
 	Image bullet = new Image("../../images/playerBullet.png");
+	Image target = new Image("../../images/shoot_target.png");
 
 	Image shooter_img = new Image("../../images/starship_sprite.png");
 	Spritesheet shooter = new Spritesheet(shooter_img, ShortRect(0, 0, 64, 64));
 	shooter.setPosition(150, 50);
 
 	List!Sprite bullets = new List!Sprite();
+	List!Spritesheet targets = new List!Spritesheet();
 
 	float sx = 0f, sy = 0f;
 	size_t lastShot = 0;
+	size_t lastEnemySpawn = 0;
+	size_t moveUpdate = 0;
 	State state = State.Menu;
 
 	Event event;
@@ -142,18 +146,57 @@ void main() {
 		smooth_move(shooter, sx, sy);
 		shooter.slideTextureRect(Spritesheet.Grid.Row);
 
+		bool drawn = false;
 		size_t i = 0;
-		for (auto it = bullets.top(); it !is null; it = it.next) {
-			wnd.draw(it.value);
+		for (auto bit = bullets.top(); bit !is null; bit = bit.next) {
+			wnd.draw(bit.value);
 
-			it.value.move(Move, 0);
-			if (it.value.X > WinWidth) {
-				writeln("Remove it: ", it.value);
-				it = bullets.erase(it);
+			bit.value.move(Move, 0);
+			if (bit.value.X > WinWidth) {
+				writeln("Remove bit: ", bit.value);
+				bit = bullets.erase(bit);
 			}
 		}
 
+		for (auto tit = targets.top(); tit !is null; tit = tit.next) {
+			wnd.draw(tit.value);
+			
+			import std.random : uniform;
+			if ((moveUpdate + 100) < Clock.getTicks()) {
+				drawn = true;
+				
+				tit.value.move(-2, uniform(-8, 8));
+			}
+			tit.value.slideTextureRect();
+
+			for (auto bit = bullets.top(); bit !is null; bit = bit.next) {
+				if (tit.collideWith(bit.value)) {
+					bit = bullets.erase(bit);
+					tit = targets.erase(tit);
+				}
+			}
+			
+			//				if (tit.value.X < WinWidth / 3)
+			//					tit.move(2, 0);
+			//
+		}
+
+		if (drawn)
+			moveUpdate = Clock.getTicks();
+
 		wnd.draw(shooter);
+
+		if ((lastEnemySpawn == 0 || (lastEnemySpawn + 2000) < Clock.getTicks())
+		    && targets.size() < 3)
+		{
+			Spritesheet enemy = new Spritesheet(target, ShortRect(0, 0, 64, 64));
+			enemy.setPosition(WinWidth - 64, WinHeight / 2);
+			targets.push_back(enemy);
+			
+			writefln("Spawn enemy on %f:%f", enemy.X, enemy.Y);
+			
+			lastEnemySpawn = Clock.getTicks();
+		}
 
 		wnd.display();
 	}
