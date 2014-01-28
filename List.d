@@ -13,6 +13,12 @@ private:
 	Entry* _top;
 	Entry* _end;
 	size_t _length;
+
+	static Entry* header;
+
+	static this() {
+		header = new Entry(T.init, null, null);
+	}
 	
 public:
 	Entry* erase(Entry* it) {
@@ -21,12 +27,12 @@ public:
 		
 		Entry* left = it.previous;
 		Entry* right = it.next;
-		
+
 		if (left !is null)
 			left.next = right;
 		if (right !is null)
 			right.previous = left;
-		
+
 		if (it is this._top)
 			this._top = right;
 		if (it is this._end)
@@ -34,7 +40,7 @@ public:
 		
 		this._length--;
 
-		return right is null ? new Entry(T.init, null, null) : right;
+		return right is null ? header : right;
 	}
 	
 	int indexOf(T value) {
