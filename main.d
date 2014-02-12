@@ -1,8 +1,8 @@
 import std.stdio;
 import std.random : uniform;
 
-static immutable string Disk = "D";
-static immutable string Mode = "Release";
+static immutable string Disk = "E";
+static immutable string Mode = "Debug";
 
 pragma(lib, Disk ~ ":\\D\\dmd2\\src\\ext\\derelict\\lib\\dmd\\DerelictSDL2.lib");
 pragma(lib, Disk ~ ":\\D\\dmd2\\src\\ext\\derelict\\lib\\dmd\\DerelictUtil.lib");
@@ -19,7 +19,7 @@ import Dgame.Window.all;
 import Dgame.Graphics.all;
 import Dgame.System.all;
 
-import Spaceshooter.List;
+import Spaceshooter.DList;
 
 enum float Slide = 0.8f;
 enum short Move = 15;
@@ -76,7 +76,7 @@ enum State : ubyte {
 }
 
 void main() {
-	Window wnd = new Window(VideoMode(WinWidth, WinHeight), "Dgame Test");
+	Window wnd = new Window(VideoMode(WinWidth, WinHeight), "Spaceshooter");
 	wnd.setVerticalSync(Window.Sync.Disable);
 	wnd.setFramerateLimit(30);
 
@@ -88,9 +88,9 @@ void main() {
 	Spritesheet shooter = new Spritesheet(shooter_img, ShortRect(0, 0, 64, 64));
 	shooter.setPosition(150, 50);
 
-	List!Sprite bullets = new List!Sprite();
-	List!Spritesheet targets = new List!Spritesheet();
-	List!Spritesheet explosions = new List!Spritesheet();
+	DList!(Sprite) bullets;
+	DList!(Spritesheet) targets;
+	DList!(Spritesheet) explosions;
 
 	Vector2f slide;
 	size_t lastShot = 0;
@@ -153,33 +153,31 @@ void main() {
 			}
 		}
 
-		smooth_move(shooter, slide);
-		shooter.slideTextureRect(Spritesheet.Grid.Row);
-
-		bool drawn = false;
-		size_t i = 0;
-		for (auto bit = bullets.top(); bit !is null; bit = bit.next) {
-			wnd.draw(bit.value);
-
-			bit.value.move(Move, 0);
-			if (bit.value.X > WinWidth) {
-				writeln("Remove bit: ", bit.value);
-				bit = bullets.erase(bit);
+		for (auto eit = explosions.begin(); eit !is null;) {
+			if (!eit.execute())
+				eit = explosions.erase(eit);
+			else {
+				wnd.draw(eit.value);
+				eit = eit.next;
 			}
 		}
 
-		for (auto tit = targets.top(); tit !is null; tit = tit.next) {
+		wnd.draw(shooter);
+		smooth_move(shooter, slide);
+		shooter.slideTextureRect(Spritesheet.Grid.Row);
+
+		for (auto tit = targets.begin(); tit !is null;) {
 			wnd.draw(tit.value);
 
-			tit.value.move(-2, uniform(-8, 8));
-			tit.value.slideTextureRect();
-	
-			for (auto bit = bullets.top(); bit !is null; bit = bit.next) {
-				if (bit is null || bit.value is null)
-					writeln("BIT: ", bit.next is null);
-				if (tit is null || tit.value is null)
-					writeln("TIT: ", tit.next is null);
+			tit.move(-2, uniform(-8, 8));
+			tit.slideTextureRect();
 
+			if (tit.X > WinWidth) {
+				writeln("Remove tit: ", tit);
+				tit.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
+			}
+
+			for (auto bit = bullets.begin(); bit !is null && tit !is null;) {
 				if (tit.collideWith(bit.value)) {
 					Spritesheet explo = new Spritesheet(explosion, ShortRect(0, 0, 64, 64));
 					explo.setLoopCount(1);
@@ -189,23 +187,29 @@ void main() {
 
 					bit = bullets.erase(bit);
 					tit = targets.erase(tit);
+				} else {
+					bit = bit.next;
 				}
+			}
+
+			if (tit is null)
+				break;
+			tit = tit.next;
+		}
+
+		bool drawn = false;
+		for (auto bit = bullets.begin(); bit !is null;) {
+			wnd.draw(bit.value);
+			bit.move(Move, 0);
+
+			if (bit.X > WinWidth) {
+				bit = bullets.erase(bit);
+			} else {
+				bit = bit.next;
 			}
 		}
 
-
-		for (auto eit = explosions.top(); eit !is null; eit = eit.next) {
-			if (!eit.execute())
-				eit = explosions.erase(eit);
-			else
-				wnd.draw(eit.value);
-		}
-
-		wnd.draw(shooter);
-
-		if ((lastEnemySpawn == 0 || (lastEnemySpawn + 2000) < Clock.getTicks())
-		    && targets.size() < 3)
-		{
+		if ((lastEnemySpawn == 0 || (lastEnemySpawn + 2000) < Clock.getTicks())) {
 			Spritesheet enemy = new Spritesheet(target, ShortRect(0, 0, 64, 64));
 			enemy.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
 			targets.push_back(enemy);

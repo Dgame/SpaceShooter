@@ -1,161 +1,199 @@
 module Spaceshooter.List;
 
-final class List(T) {
-	static struct Entry {
-		T value;
-		Entry* next;
-		Entry* previous;
+private import Dgame.Internal.Allocator;
+
+struct List(T) {
+	static struct Range {
+		Node* current;
 		
+		this(Node* cur) pure nothrow {
+			this.current = cur;
+		}
+		
+		inout(T) front() inout pure nothrow {
+			return this.current.value;
+		}
+		
+		void popFront() pure nothrow {
+			this.current = this.current.next;
+		}
+		
+		bool empty() const pure nothrow {
+			return this.current is null;
+		}
+	}
+	
+	static struct Node {
+		T value;
+		Node* next;
+		Node* prev;
+
 		alias value this;
 	}
 	
-private:
-	Entry* _top;
-	Entry* _end;
-	size_t _length;
-
-	static Entry* header;
-
-	static this() {
-		header = new Entry(T.init, null, null);
-	}
+	Node* _head;
+	Node* _end;
 	
-public:
-	Entry* erase(Entry* it) {
-		if (it is null)
-			return null;
-		
-		Entry* left = it.previous;
-		Entry* right = it.next;
+	int length;
 
-		if (left !is null)
-			left.next = right;
-		if (right !is null)
-			right.previous = left;
-
-		if (it is this._top)
-			this._top = right;
-		if (it is this._end)
-			this._end = null;
-		
-		this._length--;
-
-		return right is null ? header : right;
-	}
-	
-	int indexOf(T value) {
-		Entry* it = this._top;
-		for (int i = 0; it.next !is null; i++, it = it.next) {
-			if (it.value == value)
-				return i;
-		}
-		
-		return -1;
-	}
-	
-@safe:
-pure:
-nothrow:
-	void push_back(T value) {
-		Entry* end = this._end;
-		this._end = new Entry(value, null, end);
+	void push_back(T value)/* pure nothrow */{
+		Node* end = this._end;
+		this._end = make_new(Node(value, null, end));
 		if (end !is null)
 			end.next = this._end;
-		
-		if (this._top is null)
-			this._top = this._end;
-		
-		this._length++;
+		if (this._head is null)
+			this._head = this._end;
+		this.length++;
 	}
 	
-	T pop_back() {
-		Entry* end = this._end;
-		this._end = end.previous;
-		
-		this._length--;
+	T pop_back()/* pure nothrow */{
+		Node* end = this._end;
+		this._end = end.prev;
+
+		this.length--;
+		scope(exit) unmake(end);
 		
 		return end.value;
 	}
 	
-	void push_front(T value) {
-		Entry* top = this._top;
-		this._top = new Entry(value, top, null);
-		if (top !is null)
-			top.previous = this._top;
-		
-		this._length++;
+	void push_front(T value)/* pure nothrow */{
+		Node* head = this._head;
+		this._head = make_new(Node(value, head, null));
+		if (head !is null)
+			head.prev = this._head;
+		if (this._end is null)
+			this._end = this._head;
+		this.length++;
 	}
 	
-	T pop_front() {
-		Entry* top = this._top;
-		this._top = top.next;
+	T pop_front()/* pure nothrow */{
+		Node* head = this._head;
+		this._head = head.next;
+
+		this.length--;
+		scope(exit) unmake(head);
 		
-		this._length--;
-		
-		return top.value;
+		return head.value;
 	}
 	
-	void insert(size_t index, T value) {
-		if (index == 0)
-			return this.push_front(value);
-		if (index == this._length - 1)
+	void insert(size_t index, T value)/* pure nothrow */{
+		Node* node = null;
+		
+		if (this.length * 0.5f > index) {
+			node = this._head;
+			for (size_t i = 0; i < index; i++, node = node.next) { }
+		} else {
+			node = this._end;
+			for (size_t i = this.length - 1; i > index; i--, node = node.next) { }
+		}
+		
+		if (node is null)
 			return this.push_back(value);
 		
-		Entry* it = this._top;
-		for (size_t i = 0; i < index && it.next !is null; i++, it = it.next) {
-			if (i == index)
-				break;
-		}
-		
-		Entry* left = it.previous;
-		Entry* nit = new Entry(value, it, left);
-		
-		if (left !is null)
-			left.next = nit;
-		it.previous = nit;
-		
-		this._length++;
+		Node* insert = make_new(Node(value, node.next, node));
+		node.next = insert;
+		node.next.prev = insert;
+
+		this.length++;
 	}
 	
-	void erase(size_t index) {
-		if (index == 0) {
-			this.pop_front();
-			
+	void erase(size_t index)/* pure nothrow */{
+		if (this.length <= index)
 			return;
+		
+		Node* node = null;
+		if (this.length * 0.5f > index) {
+			node = this._head;
+			for (size_t i = 0; i < index; i++, node = node.next) { }
+		} else {
+			node = this._end;
+			for (size_t i = this.length - 1; i > index; i--, node = node.next) { }
 		}
 		
-		if (index == this._length - 1) {
-			this.pop_back();
-			
-			return;
+		this.erase(node);
+	}
+	
+	Node* erase(Node* node)/* pure nothrow */{
+		if (node is null)
+			return null;
+		
+		Node* prev = node.prev;
+		Node* next = node.next;
+		
+		if (prev !is null)
+			prev.next = next;
+		if (next !is null)
+			next.prev = prev;
+
+		this.length--;
+
+		unmake(node);
+
+		return next;
+	}
+	
+	Node* remove(T value)/* pure nothrow */{
+		for (Node* node = this._head; node !is null; node = node.next) {
+			if (node.value == value) {
+				return this.erase(node);
+			}
 		}
-		
-		Entry* it = this._top;
-		for (size_t i = 0; i < index && it.next !is null; i++, it = it.next) {
-			if (i == index)
-				break;
+
+		return null;
+	}
+	
+	Node* begin() pure nothrow {
+		return this._head;
+	}
+
+	Range opSlice() pure nothrow {
+		return Range(this._head);
+	}
+}
+
+unittest {
+	List!(int) list;
+	list.push_back(42);
+	list.push_back(23);
+	list.push_back(8);
+	list.push_back(4);
+	
+	foreach (int value; list) {
+		if (value == 23)
+			list.remove(value);
+	}
+	
+	auto range = list[];
+	assert(range.front == 42);
+	range.popFront();
+	assert(range.front == 8);
+	range.popFront();
+	assert(range.front == 4);
+	assert(range.empty);
+	
+	list.insert(1, 1337);
+	
+	range = list[];
+	assert(range.front == 42);
+	range.popFront();
+	assert(range.front == 1337);
+	range.popFront();
+	assert(range.front == 8);
+	range.popFront();
+	assert(range.front == 4);
+	assert(range.empty);
+	
+	for (auto it = list.begin(); it !is null;) {
+		if (it.value == 4 || it.value == 1337)
+			it = list.erase(it);
+		else {
+			it = it.next;
 		}
-		
-		Entry* left = it.previous;
-		Entry* right = it.next;
-		
-		if (left !is null)
-			left.next = right;
-		if (right !is null)
-			right.previous = left;
-		
-		this._length--;
 	}
 	
-	inout(Entry)* top() inout {
-		return this._top;
-	}
-	
-	inout(Entry)* end() inout {
-		return this._end;
-	}
-	
-	size_t size() const {
-		return this._length;
-	}
+	range = list[];
+	assert(range.front == 42);
+	range.popFront();
+	assert(range.front == 8);
+	assert(range.empty);
 }
