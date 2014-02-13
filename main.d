@@ -2,7 +2,7 @@ import std.stdio;
 import std.random : uniform;
 
 static immutable string Disk = "E";
-static immutable string Mode = "Debug";
+static immutable string Mode = "Release";
 
 pragma(lib, Disk ~ ":\\D\\dmd2\\src\\ext\\derelict\\lib\\dmd\\DerelictSDL2.lib");
 pragma(lib, Disk ~ ":\\D\\dmd2\\src\\ext\\derelict\\lib\\dmd\\DerelictUtil.lib");
@@ -80,13 +80,24 @@ void main() {
 	wnd.setVerticalSync(Window.Sync.Disable);
 	wnd.setFramerateLimit(30);
 
-	Image bullet = new Image("../../images/playerBullet.png");
-	Image target = new Image("../../images/shoot_target.png");
-	Image explosion = new Image("../../images/explosion2.png");
-
 	Image shooter_img = new Image("../../images/starship_sprite.png");
+	Image bullet_img = new Image("../../images/playerBullet.png");
+	Image target_img = new Image("../../images/shoot_target.png");
+	Image explosion_img = new Image("../../images/explosion2.png");
+	Image cloud_img = new Image("../../images/cloud.png");
+
+	Sprite[4] clouds;
+	ushort cloud_x = 0;
+	foreach (ref Sprite cloud; clouds) {
+		cloud = new Sprite(cloud_img);
+		cloud.setPosition(cloud_x, uniform(cloud_img.height + 64, WinHeight / 2));
+
+		cloud_x += cloud_img.width + 32;
+	}
+
 	Spritesheet shooter = new Spritesheet(shooter_img, ShortRect(0, 0, 64, 64));
 	shooter.setPosition(150, 50);
+	shooter.setTickOffset(80);
 
 	DList!(Sprite) bullets;
 	DList!(Spritesheet) targets;
@@ -95,7 +106,13 @@ void main() {
 	Vector2f slide;
 	size_t lastShot = 0;
 	size_t lastEnemySpawn = 0;
+	size_t escaped = 0;
 	State state = State.Menu;
+
+	Blend blend = new Blend(Blend.Mode.Multiply);
+
+	Text text = new Text(Font("../../images/ariali.ttf", 26));
+	text.setBlend(blend);
 
 	Event event;
 	while (wnd.isOpen()) {
@@ -134,10 +151,10 @@ void main() {
 
 								shooter.row = 1;
 
-								Sprite my_bullet = new Sprite(bullet);
-								my_bullet.setPosition(shooter.X + shooter.width,
-								                      shooter.Y + (shooter.height / 2));
-								bullets.push_back(my_bullet);
+								Sprite bullet = new Sprite(bullet_img);
+								bullet.setPosition(shooter.position.x + shooter.width / 3,
+								                      shooter.position.y + shooter.height / 3);
+								bullets.push_back(bullet);
 							}
 							break;
 						default: break;
@@ -151,6 +168,16 @@ void main() {
 
 				default: break;
 			}
+		}
+
+		foreach (Sprite cloud; clouds) {
+			cloud.move(uniform(0.5, 2.2), uniform(-1.5, 1.5));
+			wnd.draw(cloud);
+
+			if (cloud.position.x >= WinWidth)
+				cloud.position.x = 0;
+			if (cloud.position.y <= cloud_img.height)
+				cloud.position.y = cloud_img.height;
 		}
 
 		for (auto eit = explosions.begin(); eit !is null;) {
@@ -172,16 +199,18 @@ void main() {
 			tit.move(-2, uniform(-8, 8));
 			tit.slideTextureRect();
 
-			if (tit.X > WinWidth) {
-				writeln("Remove tit: ", tit);
-				tit.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
+			if (tit.position.x <= 0 || tit.position.y <= 0) {
+				tit.setPosition(WinWidth - 64, WinHeight / uniform(1.5, 4.5));
+
+				escaped++;
 			}
 
 			for (auto bit = bullets.begin(); bit !is null && tit !is null;) {
 				if (tit.collideWith(bit.value)) {
-					Spritesheet explo = new Spritesheet(explosion, ShortRect(0, 0, 64, 64));
+					Spritesheet explo = new Spritesheet(explosion_img, ShortRect(0, 0, 64, 64));
 					explo.setLoopCount(1);
-					explo.setPosition(tit.X, tit.Y);
+					explo.setTickOffset(75);
+					explo.setPosition(tit.position);
 
 					explosions.push_back(explo);
 
@@ -196,13 +225,12 @@ void main() {
 				break;
 			tit = tit.next;
 		}
-
-		bool drawn = false;
+		
 		for (auto bit = bullets.begin(); bit !is null;) {
 			wnd.draw(bit.value);
 			bit.move(Move, 0);
 
-			if (bit.X > WinWidth) {
+			if (bit.position.x > WinWidth) {
 				bit = bullets.erase(bit);
 			} else {
 				bit = bit.next;
@@ -210,14 +238,19 @@ void main() {
 		}
 
 		if ((lastEnemySpawn == 0 || (lastEnemySpawn + 2000) < Clock.getTicks())) {
-			Spritesheet enemy = new Spritesheet(target, ShortRect(0, 0, 64, 64));
-			enemy.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
-			targets.push_back(enemy);
+			Spritesheet target = new Spritesheet(target_img, ShortRect(0, 0, 64, 64));
+			target.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
+			targets.push_back(target);
+			target.setTickOffset(60);
 			
-			writefln("Spawn enemy on %f:%f", enemy.X, enemy.Y);
+//			writefln("Spawn enemy on %f:%f", target.position.x, target.position.y);
 			
 			lastEnemySpawn = Clock.getTicks();
 		}
+
+		Time time = Time.remain(Clock.getTime());
+		text.format("Escaped: %d        Time: %0.f min. %0.1f sec.", escaped, time.minutes, time.seconds);
+		wnd.draw(text);
 
 		wnd.display();
 	}
