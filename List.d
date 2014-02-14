@@ -1,119 +1,31 @@
 module Spaceshooter.List;
 
-private import Dgame.Internal.Allocator;
-
-struct List(T) {
-	static struct Range {
-		Node* current;
-		
-		this(Node* cur) pure nothrow {
-			this.current = cur;
-		}
-		
-		inout(T) front() inout pure nothrow {
-			return this.current.value;
-		}
-		
-		void popFront() pure nothrow {
-			this.current = this.current.next;
-		}
-		
-		bool empty() const pure nothrow {
-			return this.current is null;
-		}
-	}
-	
+struct DList(T) {
 	static struct Node {
-		T value;
-		Node* next;
 		Node* prev;
+		Node* next;
+		
+		T value;
 
 		alias value this;
 	}
 	
-	Node* _head;
-	Node* _end;
+	Node* head;
+	Node* end;
 	
-	int length;
-
-	void push_back(T value)/* pure nothrow */{
-		Node* end = this._end;
-		this._end = make_new(Node(value, null, end));
-		if (end !is null)
-			end.next = this._end;
-		if (this._head is null)
-			this._head = this._end;
-		this.length++;
-	}
-	
-	T pop_back()/* pure nothrow */{
-		Node* end = this._end;
-		this._end = end.prev;
-
-		this.length--;
-		scope(exit) unmake(end);
-		
-		return end.value;
-	}
-	
-	void push_front(T value)/* pure nothrow */{
-		Node* head = this._head;
-		this._head = make_new(Node(value, head, null));
-		if (head !is null)
-			head.prev = this._head;
-		if (this._end is null)
-			this._end = this._head;
-		this.length++;
-	}
-	
-	T pop_front()/* pure nothrow */{
-		Node* head = this._head;
-		this._head = head.next;
-
-		this.length--;
-		scope(exit) unmake(head);
-		
-		return head.value;
-	}
-	
-	void insert(size_t index, T value)/* pure nothrow */{
-		Node* node = null;
-		
-		if (this.length * 0.5f > index) {
-			node = this._head;
-			for (size_t i = 0; i < index; i++, node = node.next) { }
+	void push_back(T value) pure nothrow {
+		if (this.head is null) {
+			this.head = new Node(null, null, value);
+			if (this.end is null)
+				this.end = this.head;
 		} else {
-			node = this._end;
-			for (size_t i = this.length - 1; i > index; i--, node = node.next) { }
+			Node* end = this.end;
+			this.end = new Node(end, null, value);
+			end.next = this.end;
 		}
-		
-		if (node is null)
-			return this.push_back(value);
-		
-		Node* insert = make_new(Node(value, node.next, node));
-		node.next = insert;
-		node.next.prev = insert;
-
-		this.length++;
 	}
 	
-	void erase(size_t index)/* pure nothrow */{
-		if (this.length <= index)
-			return;
-		
-		Node* node = null;
-		if (this.length * 0.5f > index) {
-			node = this._head;
-			for (size_t i = 0; i < index; i++, node = node.next) { }
-		} else {
-			node = this._end;
-			for (size_t i = this.length - 1; i > index; i--, node = node.next) { }
-		}
-		
-		this.erase(node);
-	}
-	
-	Node* erase(Node* node)/* pure nothrow */{
+	Node* erase(Node* node) pure nothrow {
 		if (node is null)
 			return null;
 		
@@ -125,55 +37,78 @@ struct List(T) {
 		if (next !is null)
 			next.prev = prev;
 
-		this.length--;
-
-		unmake(node);
-
+		if (node is this.head)
+			this.head = next;
+		else if (node is this.end)
+			this.end = prev;
+		
 		return next;
 	}
 	
-	Node* remove(T value)/* pure nothrow */{
-		for (Node* node = this._head; node !is null; node = node.next) {
-			if (node.value == value) {
-				return this.erase(node);
-			}
+	Node* find(T value)/* pure nothrow */{
+		for (Node* it = this.head; it !is null; it = it.next) {
+			if (it.value == value)
+				return it;
 		}
-
+		
 		return null;
 	}
 	
-	Node* begin() pure nothrow {
-		return this._head;
+	void insert(size_t index, T value) {
+		Node* it = this.head;
+		for (size_t i = 0; i < index && it !is null; it = it.next, i++) { }
+		
+		if (it is null)
+			return this.push_back(value);
+		
+		Node* prev = it.prev;
+		Node* insert = new Node(prev, it, value);
+		
+		it.prev = insert;
+		if (prev !is null)
+			prev.next = insert;
 	}
-
+	
+	Node* begin() pure nothrow {
+		return this.head;
+	}
+	
+	static struct Range {
+		Node* cur;
+		
+		this(Node* cur) pure nothrow {
+			this.cur = cur;
+		}
+		
+		T front() pure nothrow {
+			return this.cur.value;
+		}
+		
+		void popFront() pure nothrow {
+			this.cur = this.cur.next;
+		}
+		
+		bool empty() const pure nothrow {
+			return this.cur is null;
+		}
+	}
+	
 	Range opSlice() pure nothrow {
-		return Range(this._head);
+		return Range(this.head);
 	}
 }
 
 unittest {
-	List!(int) list;
+	DList!(int) list;
 	list.push_back(42);
 	list.push_back(23);
 	list.push_back(8);
 	list.push_back(4);
-	
-	foreach (int value; list) {
-		if (value == 23)
-			list.remove(value);
-	}
-	
-	auto range = list[];
-	assert(range.front == 42);
-	range.popFront();
-	assert(range.front == 8);
-	range.popFront();
-	assert(range.front == 4);
-	assert(range.empty);
-	
+
+	list.erase(list.find(23));
 	list.insert(1, 1337);
 	
-	range = list[];
+	auto range = list[];
 	assert(range.front == 42);
 	range.popFront();
 	assert(range.front == 1337);
@@ -181,19 +116,21 @@ unittest {
 	assert(range.front == 8);
 	range.popFront();
 	assert(range.front == 4);
+	range.popFront();
 	assert(range.empty);
-	
+
 	for (auto it = list.begin(); it !is null;) {
-		if (it.value == 4 || it.value == 1337)
+		if (it.value == 4 || it.value == 1337) {
 			it = list.erase(it);
-		else {
+		} else {
 			it = it.next;
 		}
 	}
-	
+
 	range = list[];
 	assert(range.front == 42);
 	range.popFront();
 	assert(range.front == 8);
+	range.popFront();
 	assert(range.empty);
 }
