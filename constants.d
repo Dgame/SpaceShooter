@@ -8,4 +8,5 @@ public {
 	enum ushort WinHeight = 480;
 	
 	enum ubyte ShotWait = 80;
+	enum ubyte MaxEscape = 2;
 }

@@ -97,6 +97,8 @@ void main() {
 	Window wnd = new Window(VideoMode(WinWidth, WinHeight), "Spaceshooter");
 	wnd.setVerticalSync(Window.Sync.Disable);
 	wnd.setFramerateLimit(30);
+	Surface icon = Surface("../../images/icon.png");
+	wnd.setIcon(icon);
 
 	Game game = new Game();
 
