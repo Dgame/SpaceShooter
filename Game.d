@@ -41,6 +41,7 @@ final class Game {
 	DList!(Spritesheet) explosions;
 
 	Text text;
+	Clock clock;
 
 	this() {
 		this.shooter_img = new Image("../../images/starship_sprite.png");
@@ -49,23 +50,42 @@ final class Game {
 		this.explosion_img = new Image("../../images/explosion2.png");
 		this.cloud_img = new Image("../../images/cloud.png");
 
-		ushort cloud_x = 0;
 		foreach (ref Sprite cloud; this.clouds) {
 			cloud = new Sprite(cloud_img);
-			cloud.setPosition(cloud_x, uniform(this.cloud_img.height + 64, WinHeight / 2));
-	
-			cloud_x += cloud_img.width + 32;
 		}
 
 		this.shooter = new Spritesheet(this.shooter_img, ShortRect(0, 0, 64, 64));
-		this.shooter.setPosition(150, 50);
-		this.shooter.setTickOffset(80);
 
 		Blend blend = new Blend(Blend.Mode.Multiply);
 	
 		this.text = new Text(Font("../../font/ariali.ttf", 26));
 		this.text.setBlend(blend);
 		this.text.move(32, 8);
+
+		this.clock = new Clock();
+	}
+
+	void init() {
+		ushort cloud_x = 0;
+		foreach (ref Sprite cloud; this.clouds) {
+			cloud.setPosition(cloud_x, uniform(this.cloud_img.height + 64, WinHeight / 2));
+			
+			cloud_x += cloud_img.width + 32;
+		}
+
+		this.shooter.setPosition(150, 50);
+		this.shooter.setTickOffset(80);
+
+		this.bullets.clear();
+		this.targets.clear();
+		this.explosions.clear();
+
+		this.escaped = 0;
+		this.lastShot = 0;
+		this.lastEnemySpawn = 0;
+		this.paused = false;
+
+		this.clock.reset();
 	}
 
 	void run(Window wnd) {
@@ -99,21 +119,21 @@ final class Game {
 						case Keyboard.Code.Down:
 							slide.y = Move;
 							break;
-						case Keyboard.Code.Space:
+						case Keyboard.Code.RCtrl:
 							if (this.paused)
 								break;
 
-							if (lastShot == 0 ||
-							    (lastShot + ShotWait) < Clock.getTicks())
+							if (this.lastShot == 0 ||
+								(this.lastShot + ShotWait) < Clock.getTicks())
 							{
-								lastShot = Clock.getTicks();
+								this.lastShot = Clock.getTicks();
 
-								shooter.row = 1;
+								this.shooter.row = 1;
 
-								Sprite bullet = new Sprite(bullet_img);
-								bullet.setPosition(shooter.position.x + shooter.width / 3,
-								                      shooter.position.y + shooter.height / 3);
-								bullets.push_back(bullet);
+								Sprite bullet = new Sprite(this.bullet_img);
+								bullet.setPosition(this.shooter.position.x + this.shooter.width / 3,
+								                      this.shooter.position.y + this.shooter.height / 3);
+								this.bullets.push_back(bullet);
 							}
 							break;
 						default: break;
@@ -121,20 +141,20 @@ final class Game {
 					break;
 				
 				case Event.Type.KeyUp:
-					if (event.keyboard.key == Keyboard.Code.Space)
-						shooter.row = 0;
+					if (event.keyboard.key == Keyboard.Code.RCtrl)
+						this.shooter.row = 0;
 					break;
 			}
 		}
 
 		if (escaped >= MaxEscape) {
-			text("You lose");
-			text.setPosition(WinWidth / 2, WinHeight / 2 - text.height);
+			this.text("You lose");
+			this.text.setPosition(WinWidth / 2, WinHeight / 2 - this.text.height);
 		} else {
 			if (this.paused)
 				return;
 
-			foreach (Sprite cloud; clouds) {
+			foreach (Sprite cloud; this.clouds) {
 				cloud.move(uniform(0.5, 2.2), uniform(-1.5, 1.5));
 				wnd.draw(cloud);
 
@@ -144,20 +164,31 @@ final class Game {
 					cloud.position.y = cloud_img.height;
 			}
 
-			for (auto eit = explosions.begin(); eit !is null;) {
+			for (auto eit = this.explosions.begin(); eit !is null;) {
 				if (!eit.execute())
-					eit = explosions.erase(eit);
+					eit = this.explosions.erase(eit);
 				else {
 					wnd.draw(eit.value);
 					eit = eit.next;
 				}
 			}
 
-			wnd.draw(shooter);
-			smooth_move(shooter, slide);
-			shooter.slideTextureRect(Spritesheet.Grid.Row);
+			wnd.draw(this.shooter);
+			smooth_move(this.shooter, slide);
+			this.shooter.slideTextureRect(Spritesheet.Grid.Row);
 
-			for (auto tit = targets.begin(); tit !is null;) {
+			for (auto bit = this.bullets.begin(); bit !is null;) {
+				wnd.draw(bit.value);
+				bit.move(Move, 0);
+				
+				if (bit.position.x > WinWidth) {
+					bit = this.bullets.erase(bit);
+				} else {
+					bit = bit.next;
+				}
+			}
+
+			for (auto tit = this.targets.begin(); tit !is null;) {
 				wnd.draw(tit.value);
 
 				tit.move(-2, uniform(-8, 8));
@@ -165,21 +196,21 @@ final class Game {
 
 				if (tit.position.x <= 0 || tit.position.y <= 0) {
 					tit.setPosition(WinWidth - 64, WinHeight / uniform(1.5, 4.5));
-
-					escaped++;
+					this.escaped++;
 				}
 
-				for (auto bit = bullets.begin(); bit !is null && tit !is null;) {
+				for (auto bit = this.bullets.begin(); bit !is null && tit !is null;) {
 					if (tit.collideWith(bit.value)) {
-						Spritesheet explo = new Spritesheet(explosion_img, ShortRect(0, 0, 64, 64));
+						Spritesheet explo = new Spritesheet(this.explosion_img,
+						                                    ShortRect(0, 0, 64, 64));
 						explo.setLoopCount(1);
 						explo.setTickOffset(75);
 						explo.setPosition(tit.position);
 
-						explosions.push_back(explo);
+						this.explosions.push_back(explo);
 
-						bit = bullets.erase(bit);
-						tit = targets.erase(tit);
+						bit = this.bullets.erase(bit);
+						tit = this.targets.erase(tit);
 					} else {
 						bit = bit.next;
 					}
@@ -189,34 +220,26 @@ final class Game {
 					break;
 				tit = tit.next;
 			}
-			
-			for (auto bit = bullets.begin(); bit !is null;) {
-				wnd.draw(bit.value);
-				bit.move(Move, 0);
 
-				if (bit.position.x > WinWidth) {
-					bit = bullets.erase(bit);
-				} else {
-					bit = bit.next;
-				}
-			}
-
-			if ((lastEnemySpawn == 0 || (lastEnemySpawn + 2000) < Clock.getTicks())) {
-				Spritesheet target = new Spritesheet(target_img, ShortRect(0, 0, 64, 64));
+			if (this.lastEnemySpawn == 0
+			     || (this.lastEnemySpawn + 2000) < Clock.getTicks())
+			{
+				Spritesheet target = new Spritesheet(this.target_img,
+				                                     ShortRect(0, 0, 64, 64));
 				target.setPosition(WinWidth - 64, WinHeight / uniform(2, 4));
-				targets.push_back(target);
 				target.setTickOffset(60);
+				this.targets.push_back(target);
 				
-				writefln("Spawn enemy on %f:%f", target.position.x, target.position.y);
-				
-				lastEnemySpawn = Clock.getTicks();
+//				writefln("Spawn enemy on %f:%f", target.position.x, target.position.y);
+
+				this.lastEnemySpawn = Clock.getTicks();
 			}
 
-			Time time = Time.remain(Clock.getTime());
-			text.format("Escaped: %d / %d        Time: %0.f min. %0.1f sec.",
-			            escaped, MaxEscape, time.minutes, time.seconds);
+			Time time = Time.remain(this.clock.getElapsedTime());
+			this.text.format("Escaped: %d / %d        Time: %0.f min. %0.1f sec.",
+			            this.escaped, MaxEscape, time.minutes, time.seconds);
 		}
 
-		wnd.draw(text);
+		wnd.draw(this.text);
 	}
 }

@@ -1,5 +1,8 @@
 module Spaceshooter.List;
 
+debug import std.stdio;
+
+// TODO: Mallocator?
 struct DList(T) {
 	static struct Node {
 		Node* prev;
@@ -12,26 +15,29 @@ struct DList(T) {
 	
 	Node* head;
 	Node* end;
-	
-	void push_back(T value) pure nothrow {
-		if (this.head is null) {
-			this.head = new Node(null, null, value);
-			if (this.end is null)
-				this.end = this.head;
-		} else {
-			Node* end = this.end;
-			this.end = new Node(end, null, value);
-			end.next = this.end;
-		}
+
+	void clear() {
+		this.head = this.end = null;
 	}
 	
-	Node* erase(Node* node) pure nothrow {
-		if (node is null)
+	void push_back(T value)/* pure nothrow */{
+		Node* end = this.end;
+		this.end = new Node(end, null, value);
+		if (this.head is null)
+			this.head = this.end;
+		if (end !is null)
+			end.next = this.end;
+	}
+	
+	Node* erase(Node* node)/* pure nothrow */{
+		if (node is null) {
+			debug writeln("Node is null");
 			return null;
+		}
 		
 		Node* prev = node.prev;
 		Node* next = node.next;
-		
+
 		if (prev !is null)
 			prev.next = next;
 		if (next !is null)
@@ -41,7 +47,7 @@ struct DList(T) {
 			this.head = next;
 		else if (node is this.end)
 			this.end = prev;
-		
+
 		return next;
 	}
 	

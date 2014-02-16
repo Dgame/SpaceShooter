@@ -71,6 +71,7 @@ void showMenu(Window wnd, ref Game game) {
 								game.state = State.Game;
 								break;
 							case "New Game":
+								game.init();
 								game.state = State.Game;
 								break;
 						}
