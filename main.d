@@ -98,23 +98,23 @@ void main() {
 	Window wnd = new Window(VideoMode(WinWidth, WinHeight), "Spaceshooter");
 	wnd.setVerticalSync(Window.Sync.Disable);
 	wnd.setFramerateLimit(30);
-	Surface icon = Surface("../../images/icon.png");
+	Surface icon = Surface(/*../../*/"images/icon.png");
 	wnd.setIcon(icon);
 
 	Game game = new Game();
 
 	Buttons = [
 		"Exit" : [
-			new Sprite(new Image("../../images/exit_button.png")),
-			new Sprite(new Image("../../images/exit_button_blended.png"))
+			new Sprite(new Image(/*../../*/"images/exit_button.png")),
+			new Sprite(new Image(/*../../*/"images/exit_button_blended.png"))
 		],
 		"Continue" : [
-			new Sprite(new Image("../../images/continue_button.png")),
-			new Sprite(new Image("../../images/continue_button_blended.png"))
+			new Sprite(new Image(/*../../*/"images/continue_button.png")),
+			new Sprite(new Image(/*../../*/"images/continue_button_blended.png"))
 		],
 		"New Game" : [
-			new Sprite(new Image("../../images/newgame_button.png")),
-			new Sprite(new Image("../../images/newgame_button_blended.png"))
+			new Sprite(new Image(/*../../*/"images/newgame_button.png")),
+			new Sprite(new Image(/*../../*/"images/newgame_button_blended.png"))
 		],
 	];
 

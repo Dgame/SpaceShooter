@@ -44,11 +44,11 @@ final class Game {
 	Clock clock;
 
 	this() {
-		this.shooter_img = new Image("../../images/starship_sprite.png");
-		this.bullet_img = new Image("../../images/playerBullet.png");
-		this.target_img = new Image("../../images/shoot_target.png");
-		this.explosion_img = new Image("../../images/explosion2.png");
-		this.cloud_img = new Image("../../images/cloud.png");
+		this.shooter_img = new Image(/*../../*/"images/starship_sprite.png");
+		this.bullet_img = new Image(/*../../*/"images/playerBullet.png");
+		this.target_img = new Image(/*../../*/"images/shoot_target.png");
+		this.explosion_img = new Image(/*../../*/"images/explosion2.png");
+		this.cloud_img = new Image(/*../../*/"images/cloud.png");
 
 		foreach (ref Sprite cloud; this.clouds) {
 			cloud = new Sprite(cloud_img);
@@ -58,7 +58,7 @@ final class Game {
 
 		Blend blend = new Blend(Blend.Mode.Multiply);
 	
-		this.text = new Text(Font("../../font/ariali.ttf", 26));
+		this.text = new Text(Font(/*../../*/"font/ariali.ttf", 26));
 		this.text.setBlend(blend);
 		this.text.move(32, 8);
 
